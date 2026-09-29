@@ -13,7 +13,7 @@ android {
 
     defaultConfig {
         applicationId = "com.sinzunza.expensetracker7"
-        minSdk = 33
+        minSdk = 30
         targetSdk = 37
         versionCode = 1
         versionName = "1.0"

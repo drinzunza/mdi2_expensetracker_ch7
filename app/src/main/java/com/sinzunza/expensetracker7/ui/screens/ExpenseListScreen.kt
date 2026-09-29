@@ -13,24 +13,25 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.sinzunza.expensetracker7.data.Expense
+import com.sinzunza.expensetracker7.data.ExpenseWithCategory
 import com.sinzunza.expensetracker7.ui.ExpenseListUiState
 import java.text.NumberFormat
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+
+// needed for top bar style
+import com.sinzunza.expensetracker7.ui.navigation.ExpenseTopAppBar
 
 private val currencyFormatter = NumberFormat.getCurrencyInstance(Locale.US)
 private val dateFormatter = DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.US)
@@ -38,7 +39,6 @@ private val dateFormatter = DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.US
 private fun Long.asCurrency(): String =
     currencyFormatter.format(this / 100.0)
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExpenseListScreen(
     state: ExpenseListUiState,
@@ -46,7 +46,11 @@ fun ExpenseListScreen(
     onExpenseClick: (Long) -> Unit,
 ) {
     Scaffold(
-        topBar = { TopAppBar(title = { Text("My expenses") }) },
+        topBar = {
+            ExpenseTopAppBar(
+                title = "My expenses",
+            )
+        },
         floatingActionButton = {
             FloatingActionButton(onClick = onAdd) { Text("+") }
         },
@@ -68,12 +72,6 @@ fun ExpenseListScreen(
                     .padding(innerPadding)
                     .padding(horizontal = 16.dp),
             ) {
-                Text("This month’s total", fontWeight = FontWeight.Medium)
-                Text(
-                    text = state.totalCents.asCurrency(),
-                    fontWeight = FontWeight.Bold,
-                )
-
                 if (state.expenses.isEmpty()) {
                     Column(
                         modifier = Modifier.fillMaxSize(),
@@ -87,8 +85,11 @@ fun ExpenseListScreen(
                         contentPadding = PaddingValues(vertical = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        items(state.expenses, key = { it.id }) { expense ->
-                            ExpenseRow(expense, onClick = { onExpenseClick(expense.id) })
+                        items(state.expenses, key = { it.expense.id }) { item ->
+                            ExpenseRow(
+                                item = item,
+                                onClick = { onExpenseClick(item.expense.id) },
+                            )
                         }
                     }
                 }
@@ -98,7 +99,8 @@ fun ExpenseListScreen(
 }
 
 @Composable
-private fun ExpenseRow(expense: Expense, onClick: () -> Unit) {
+private fun ExpenseRow(item: ExpenseWithCategory, onClick: () -> Unit) {
+    val expense = item.expense
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -106,7 +108,7 @@ private fun ExpenseRow(expense: Expense, onClick: () -> Unit) {
             .padding(vertical = 12.dp),
     ) {
         Column {
-            Text(expense.category, fontWeight = FontWeight.SemiBold)
+            Text(item.categoryName, fontWeight = FontWeight.SemiBold)
             val date = expense.occurredAt
                 .atZone(ZoneId.systemDefault())
                 .toLocalDate()

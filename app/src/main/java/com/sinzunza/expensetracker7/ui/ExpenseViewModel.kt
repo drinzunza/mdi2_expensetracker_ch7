@@ -8,6 +8,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.sinzunza.expensetracker7.data.Expense
 import com.sinzunza.expensetracker7.data.ExpenseRepository
+import com.sinzunza.expensetracker7.data.ExpenseWithCategory
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,7 +26,7 @@ import java.time.YearMonth
 sealed interface ExpenseListUiState {
     data object Loading : ExpenseListUiState
     data class Content(
-        val expenses: List<Expense>,
+        val expenses: List<ExpenseWithCategory>,
         val totalCents: Long,
         val month: YearMonth,
     ) : ExpenseListUiState
@@ -47,10 +48,10 @@ class ExpenseViewModel(
 
     val uiState: StateFlow<ExpenseListUiState> = currentMonth
         .flatMapLatest { month ->
-            repository.observeMonth(month).map<List<Expense>, ExpenseListUiState> { expenses ->
+            repository.observeMonth(month).map<List<ExpenseWithCategory>, ExpenseListUiState> { expenses ->
                 ExpenseListUiState.Content(
                     expenses = expenses,
-                    totalCents = expenses.sumOf { it.amountCents },
+                    totalCents = expenses.sumOf { it.expense.amountCents },
                     month = month,
                 )
             }
@@ -65,7 +66,7 @@ class ExpenseViewModel(
     private val _editorState = MutableStateFlow<EditorUiState>(EditorUiState.Idle)
     val editorState: StateFlow<EditorUiState> = _editorState.asStateFlow()
 
-    fun observeExpense(id: Long): Flow<Expense?> =
+    fun observeExpense(id: Long): Flow<ExpenseWithCategory?> =
         repository.observeExpense(id)
 
     fun refreshMonth() {

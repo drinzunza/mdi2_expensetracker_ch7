@@ -8,13 +8,13 @@ class ExpenseRepository(private val dao: ExpenseDao) {
     fun observeMonth(
         month: YearMonth,
         zoneId: ZoneId = ZoneId.systemDefault(),
-    ): Flow<List<Expense>> {
+    ): Flow<List<ExpenseWithCategory>> {
         val start = month.atDay(1).atStartOfDay(zoneId).toInstant()
         val end = month.plusMonths(1).atDay(1).atStartOfDay(zoneId).toInstant()
         return dao.observeBetween(start, end)
     }
 
-    fun observeExpense(id: Long): Flow<Expense?> =
+    fun observeExpense(id: Long): Flow<ExpenseWithCategory?> =
         dao.observeById(id)
 
     suspend fun save(expense: Expense): Long =

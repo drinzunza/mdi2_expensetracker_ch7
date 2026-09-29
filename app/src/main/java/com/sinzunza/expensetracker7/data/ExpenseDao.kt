@@ -10,8 +10,16 @@ import java.time.Instant
 @Dao
 interface ExpenseDao {
 
-    @Query("SELECT * FROM expenses WHERE id = :id LIMIT 1")
-    fun observeById(id: Long): Flow<Expense?>
+    @Query(
+        """
+        SELECT expenses.*, categories.name AS categoryName
+        FROM expenses
+        INNER JOIN categories ON categories.id = expenses.categoryId
+        WHERE expenses.id = :id
+        LIMIT 1
+        """
+    )
+    fun observeById(id: Long): Flow<ExpenseWithCategory?>
 
     @Upsert
     suspend fun upsert(expense: Expense): Long
@@ -20,12 +28,15 @@ interface ExpenseDao {
     suspend fun delete(expense: Expense)
 
     @Query("""
-        SELECT * FROM expenses
-        WHERE occurredAt >= :startInclusive AND occurredAt < :endExclusive
-        ORDER BY occurredAt DESC
+        SELECT expenses.*, categories.name AS categoryName
+        FROM expenses
+        INNER JOIN categories ON categories.id = expenses.categoryId
+        WHERE expenses.occurredAt >= :startInclusive
+          AND expenses.occurredAt < :endExclusive
+        ORDER BY expenses.occurredAt DESC
     """)
     fun observeBetween(
         startInclusive: Instant,
         endExclusive: Instant,
-    ): Flow<List<Expense>>
+    ): Flow<List<ExpenseWithCategory>>
 }

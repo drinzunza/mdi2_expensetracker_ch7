@@ -6,10 +6,20 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 
-@Database(entities = [Expense::class], version = 1, exportSchema = false)
+@Database(
+    entities = [
+        Expense::class,
+        Category::class,
+    ],
+    version = 3,
+    exportSchema = false,
+)
 @TypeConverters(Converters::class)
 abstract class ExpenseDatabase : RoomDatabase() {
+
     abstract fun expenseDao(): ExpenseDao
+
+    abstract fun categoryDao(): CategoryDao
 
     companion object {
         @Volatile
@@ -21,7 +31,11 @@ abstract class ExpenseDatabase : RoomDatabase() {
                     context.applicationContext,
                     ExpenseDatabase::class.java,
                     "expense-tracker.db",
-                ).build().also { instance = it }
+                )
+                    .build()
+                    .also { database ->
+                        instance = database
+                    }
             }
     }
 }

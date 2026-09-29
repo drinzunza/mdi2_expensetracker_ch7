@@ -8,25 +8,33 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.sinzunza.expensetracker7.data.Category
 import com.sinzunza.expensetracker7.data.Expense
+import com.sinzunza.expensetracker7.data.ExpenseWithCategory
 import java.math.RoundingMode
 import java.time.Instant
+
+import com.sinzunza.expensetracker7.ui.navigation.ExpenseTopAppBar
 
 private fun parseCents(input: String): Long? = runCatching {
     input.trim()
@@ -40,37 +48,50 @@ private fun parseCents(input: String): Long? = runCatching {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExpenseFormScreen(
-    existing: Expense?,
+    existing: ExpenseWithCategory?,
+    categories: List<Category>,
     isEditing: Boolean,
     isSaving: Boolean,
     errorMessage: String?,
     onBack: () -> Unit,
+    onManageCategories: () -> Unit,
     onSave: (Expense) -> Unit,
     onDelete: (Expense) -> Unit,
 ) {
-    var amount by rememberSaveable(existing?.id) {
-        mutableStateOf(existing?.let { (it.amountCents / 100.0).toString() } ?: "")
+    val existingExpense = existing?.expense
+
+    var amount by rememberSaveable(existingExpense?.id) {
+        mutableStateOf(existingExpense?.let { (it.amountCents / 100.0).toString() } ?: "")
     }
-    var category by rememberSaveable(existing?.id) {
-        mutableStateOf(existing?.category ?: "")
+    var selectedCategoryId by rememberSaveable(existingExpense?.id) {
+        mutableStateOf(existingExpense?.categoryId)
     }
-    var note by rememberSaveable(existing?.id) {
-        mutableStateOf(existing?.note ?: "")
+    var categoryMenuExpanded by rememberSaveable { mutableStateOf(false) }
+    var note by rememberSaveable(existingExpense?.id) {
+        mutableStateOf(existingExpense?.note ?: "")
     }
     var attemptedSave by rememberSaveable { mutableStateOf(false) }
     val cents = parseCents(amount)
     val amountError = attemptedSave && cents == null
-    val categoryError = attemptedSave && category.isBlank()
+    val categoryError = attemptedSave && selectedCategoryId == null
+    val selectedCategoryName = categories
+        .firstOrNull { it.id == selectedCategoryId }
+        ?.name
+        ?: existing?.categoryName.orEmpty()
 
     BackHandler(enabled = isSaving) { /* Wait for the write to finish. */ }
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(if (isEditing) "Edit expense" else "New expense") },
-                navigationIcon = {
-                    TextButton(onClick = onBack, enabled = !isSaving) { Text("Back") }
+            ExpenseTopAppBar(
+                title = if (isEditing) {
+                    "Edit expense"
+                } else {
+                    "New expense"
                 },
+                showBackButton = true,
+                backEnabled = !isSaving,
+                onBack = onBack,
             )
         },
     ) { innerPadding ->
@@ -90,18 +111,71 @@ fun ExpenseFormScreen(
                 supportingText = {
                     if (amountError) Text("Enter an amount greater than zero")
                 },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("amountInput"),
             )
-            OutlinedTextField(
-                value = category,
-                onValueChange = { category = it },
-                label = { Text("Category") },
-                isError = categoryError,
-                supportingText = {
-                    if (categoryError) Text("Category is required")
+
+            ExposedDropdownMenuBox(
+                expanded = categoryMenuExpanded,
+                onExpandedChange = { shouldExpand ->
+                    if (categories.isNotEmpty() && !isSaving) {
+                        categoryMenuExpanded = shouldExpand
+                    }
                 },
-                modifier = Modifier.fillMaxWidth(),
-            )
+            ) {
+                OutlinedTextField(
+                    value = selectedCategoryName,
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Category") },
+                    placeholder = { Text("Select a category") },
+                    trailingIcon = {
+                        ExposedDropdownMenuDefaults.TrailingIcon(
+                            expanded = categoryMenuExpanded,
+                        )
+                    },
+                    isError = categoryError,
+                    supportingText = {
+                        when {
+                            categories.isEmpty() -> Text("Create a category before saving")
+                            categoryError -> Text("Select a category")
+                        }
+                    },
+                    modifier = Modifier
+                        .menuAnchor(
+                            type = ExposedDropdownMenuAnchorType.PrimaryNotEditable,
+                            enabled = categories.isNotEmpty() && !isSaving,
+                        )
+                        .fillMaxWidth()
+                        .testTag("categoryDropdown"),
+                )
+
+                ExposedDropdownMenu(
+                    expanded = categoryMenuExpanded,
+                    onDismissRequest = { categoryMenuExpanded = false },
+                ) {
+                    categories.forEach { category ->
+                        DropdownMenuItem(
+                            text = { Text(category.name) },
+                            onClick = {
+                                selectedCategoryId = category.id
+                                categoryMenuExpanded = false
+                            },
+                        )
+                    }
+                }
+            }
+
+            if (categories.isEmpty()) {
+                TextButton(
+                    onClick = onManageCategories,
+                    enabled = !isSaving,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Manage categories")
+                }
+            }
             OutlinedTextField(
                 value = note,
                 onValueChange = { note = it },
@@ -111,20 +185,23 @@ fun ExpenseFormScreen(
             Button(
                 onClick = {
                     attemptedSave = true
-                    if (cents != null && category.isNotBlank()) {
+                    val categoryId = selectedCategoryId
+                    if (cents != null && categoryId != null) {
                         onSave(
                             Expense(
-                                id = existing?.id ?: 0,
+                                id = existingExpense?.id ?: 0,
                                 amountCents = cents,
-                                category = category.trim(),
+                                categoryId = categoryId,
                                 note = note.trim(),
-                                occurredAt = existing?.occurredAt ?: Instant.now(),
+                                occurredAt = existingExpense?.occurredAt ?: Instant.now(),
                             ),
                         )
                     }
                 },
-                enabled = !isSaving,
-                modifier = Modifier.fillMaxWidth(),
+                enabled = !isSaving && categories.isNotEmpty(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("saveExpense"),
             ) { Text(if (isSaving) "Saving…" else "Save") }
 
             errorMessage?.let { message ->
@@ -136,9 +213,9 @@ fun ExpenseFormScreen(
                 )
             }
 
-            if (existing != null) {
+            if (existingExpense != null) {
                 TextButton(
-                    onClick = { onDelete(existing) },
+                    onClick = { onDelete(existingExpense) },
                     enabled = !isSaving,
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text("Delete expense") }
